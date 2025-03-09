@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { useState } from 'react';
+import html2canvas from 'html2canvas';
 
 
 
@@ -13,7 +14,7 @@ const COMPANY_INFO = {
   website: 'https://dental-clinic.example.com'
 };
 
-export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerateEnd }) {
+export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -26,7 +27,7 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
   };
   
   // PDFを生成する関数
-  const generatePdf = () => {
+  const generatePdf = async () => {
     setIsGenerating(true);
     setError(null);
     
@@ -34,102 +35,64 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
     
     try {
       console.log('PDF生成開始');
-      const { clinicInfo, results } = data;
-      console.log('データ:', { clinicInfo, results });
-      
-      // テキストベースのPDFを直接生成する方法に変更
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      // フォント設定
-      pdf.setFont('Helvetica');
-      pdf.setFontSize(10);
-      
-      // タイトル
-      pdf.setFontSize(18);
-      pdf.text('歯科医院経営診断結果', 105, 20, { align: 'center' });
-      
-      // 医院情報
-      pdf.setFontSize(14);
-      pdf.text('医院情報', 20, 40);
-      pdf.setFontSize(12);
-      pdf.text(`医院名: ${clinicInfo.clinicName}`, 20, 50);
-      pdf.text(`回答者: ${clinicInfo.respondentName}`, 20, 57);
-      pdf.text(`診断日: ${new Date(clinicInfo.date).toLocaleDateString('ja-JP')}`, 20, 64);
-      
-      // 診断結果概要
-      pdf.setFontSize(14);
-      pdf.text('診断結果概要', 20, 80);
-      pdf.setFontSize(12);
-      pdf.text(`総合評価: ${results.status}`, 20, 90);
-      pdf.text(`全20問中 ${results.totalYes}問が「はい」`, 20, 97);
-      
-      // カテゴリ別スコア
-      pdf.setFontSize(14);
-      pdf.text('カテゴリ別スコア', 20, 115);
-      
-      // テーブルデータ
-      const tableData = [
-        ['カテゴリ', 'スコア', '評価'],
-        ['財務管理', `${results.categories.finance}/5`, getEvaluation(results.categories.finance)],
-        ['患者数・売上', `${results.categories.patients}/5`, getEvaluation(results.categories.patients)],
-        ['スタッフ管理', `${results.categories.staff}/5`, getEvaluation(results.categories.staff)],
-        ['患者満足度', `${results.categories.satisfaction}/5`, getEvaluation(results.categories.satisfaction)]
-      ];
-      
-      // テーブルの描画
-      pdf.autoTable({
-        startY: 120,
-        head: [tableData[0]],
-        body: tableData.slice(1),
-        theme: 'grid',
-        styles: { fontSize: 10, cellPadding: 3 },
-        headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] }
-      });
-      
-      // 改善アドバイス
-      let adviceY = pdf.autoTable.previous.finalY + 15;
-      pdf.setFontSize(14);
-      pdf.text('改善アドバイス', 20, adviceY);
-      pdf.setFontSize(10);
-      adviceY += 10;
-      
-      if (results.categories.finance < 3) {
-        pdf.text('【財務管理】毎月の収支を正確に把握し、3ヶ月先の資金計画を立てましょう。税理士などの専門家と定期的に相談することをお勧めします。', 20, adviceY, { maxWidth: 170 });
-        adviceY += 15;
+      if (!printTargetRef || !printTargetRef.current) {
+        throw new Error('印刷対象の要素が見つかりません');
       }
+
+      // 会社情報の準備
+      const companyInfoHtml = `
+        <div style="font-family: sans-serif; font-size: 10px; padding: 10px; border-top: 1px solid #eee; margin-top: 20px;">
+          <p><strong>会社情報:</strong></p>
+          <p>${COMPANY_INFO.name}</p>
+          <p>住所: ${COMPANY_INFO.address}</p>
+          <p>電話: ${COMPANY_INFO.phone} | メール: ${COMPANY_INFO.email}</p>
+          <p>ウェブサイト: ${COMPANY_INFO.website}</p>
+        </div>
+      `;
       
-      if (results.categories.patients < 3) {
-        pdf.text('【患者数・売上】新規患者とリピーターの比率分析、リコール率の向上に取り組みましょう。自由診療の提案方法も見直すと良いでしょう。', 20, adviceY, { maxWidth: 170 });
-        adviceY += 15;
-      }
+      // 会社情報を表示するための一時的な要素を作成
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = companyInfoHtml;
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.bottom = '0';
+      tempDiv.style.width = '100%';
+      tempDiv.style.backgroundColor = 'white';
       
-      if (results.categories.staff < 3) {
-        pdf.text('【スタッフ管理】給与体系の見直しと教育研修の充実を図りましょう。労務トラブルの対応マニュアルも整備すると安心です。', 20, adviceY, { maxWidth: 170 });
-        adviceY += 15;
-      }
+      // 一時的な要素を追加
+      printTargetRef.current.appendChild(tempDiv);
       
-      if (results.categories.satisfaction < 3) {
-        pdf.text('【患者満足度】口コミ対策と院内環境の整備を優先し、定期的な患者アンケートを実施して改善に活かしましょう。', 20, adviceY, { maxWidth: 170 });
-        adviceY += 15;
-      }
+      console.log('HTML要素のキャプチャを開始');
       
-      if (results.categories.finance >= 3 && results.categories.patients >= 3 && 
-          results.categories.staff >= 3 && results.categories.satisfaction >= 3) {
-        pdf.text('全てのカテゴリで良好な結果です。現状を維持しながら、さらなる向上を目指しましょう。', 20, adviceY, { maxWidth: 170 });
-        adviceY += 15;
-      }
-      
-      // 会社情報をPDFに追加
-      pdf.setFontSize(10);
-      pdf.text('会社情報:', 20, 270);
-      pdf.text(`${COMPANY_INFO.name}`, 20, 275);
-      pdf.text(`住所: ${COMPANY_INFO.address}`, 20, 280);
-      pdf.text(`電話: ${COMPANY_INFO.phone} | メール: ${COMPANY_INFO.email}`, 20, 285);
-      pdf.text(`ウェブサイト: ${COMPANY_INFO.website}`, 20, 290);
-      
-      // PDFをブラウザで表示
-      console.log('PDF生成準備完了');
       try {
+        // HTML要素をキャンバスに変換
+        const canvas = await html2canvas(printTargetRef.current, {
+          scale: 2, // 高解像度
+          useCORS: true, // 外部リソースを許可
+          logging: false, // ログを無効化
+          backgroundColor: '#ffffff', // 背景色を白に
+          scrollY: -window.scrollY // スクロール位置を考慮
+        });
+        
+        // キャンバスからイメージデータを取得
+        const imgData = canvas.toDataURL('image/png');
+        
+        // PDFのサイズを設定（A4）
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        // キャンバスの縦横比を計算
+        const imgWidth = 210; // A4の幅（mm）
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // イメージをPDFに追加
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        
+        // PDFをブラウザで表示
+        console.log('PDF生成準備完了');
+        
         // PDFをBlobとして出力
         const pdfBlob = pdf.output('blob');
         // BlobからURLを作成
@@ -137,9 +100,14 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
         // 新しいタブでPDFを開く
         window.open(blobUrl, '_blank');
         console.log('PDF生成完了、ブラウザで表示しました');
-      } catch (saveError) {
-        console.error('PDFの表示中にエラーが発生しました:', saveError);
-        throw new Error('PDFの表示中にエラーが発生しました: ' + saveError.message);
+      } catch (captureError) {
+        console.error('HTML要素のキャプチャ中にエラーが発生しました:', captureError);
+        throw new Error('HTML要素のキャプチャ中にエラーが発生しました: ' + captureError.message);
+      } finally {
+        // 一時的な要素を削除
+        if (tempDiv && tempDiv.parentNode) {
+          tempDiv.parentNode.removeChild(tempDiv);
+        }
       }
     } catch (error) {
       console.error('PDF生成エラー:', error);
@@ -169,7 +137,7 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
             </svg>
             PDF生成中...
           </span>
-        ) : "日本語PDFを表示"}
+        ) : "診断結果をPDFで表示"}
       </button>
       
       {/* エラーメッセージ表示 */}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { 
   Radar, RadarChart, PolarGrid, 
   PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer 
@@ -15,6 +15,9 @@ export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfG
   // 内部でもPDF生成状態を管理する
   const [isPdfGenerating, setIsPdfGenerating] = useState(externalIsPdfGenerating);
   const { clinicInfo, answers, results } = data;
+  
+  // PDF生成用の参照を作成
+  const printTargetRef = useRef(null);
   
   // レーダーチャートデータの生成
   const getChartData = () => {
@@ -103,7 +106,7 @@ export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfG
   };
   
   return (
-    <div className="bg-white p-8 rounded-xl shadow-lg mb-6 animate-fade-in max-w-5xl mx-auto">
+    <div ref={printTargetRef} className="bg-white p-8 rounded-xl shadow-lg mb-6 animate-fade-in max-w-5xl mx-auto">
       <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">診断結果</h2>
       
       <div className={`${statusBgColor} p-6 rounded-lg border ${statusBorderColor} mb-10`}>
@@ -242,6 +245,7 @@ export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfG
         {/* 日本語PDF生成コンポーネント */}
         <JapanesePdfGenerator 
           data={data} 
+          printTargetRef={printTargetRef}
           onGenerateStart={() => setIsPdfGenerating(true)}
           onGenerateEnd={() => setIsPdfGenerating(false)}
         />
