@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import html2canvas from 'html2canvas';
-import { useRef } from 'react';
+import { useState } from 'react';
+
+
 
 // 会社情報の設定
 const COMPANY_INFO = {
@@ -13,7 +14,8 @@ const COMPANY_INFO = {
 };
 
 export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerateEnd }) {
-  const pdfRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // 評価を返す関数
   const getEvaluation = (score) => {
@@ -24,16 +26,23 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
   };
   
   // PDFを生成する関数
-  const generatePdf = async () => {
-    if (!pdfRef.current) return;
+  const generatePdf = () => {
+    setIsGenerating(true);
+    setError(null);
     
     onGenerateStart();
     
     try {
+      console.log('PDF生成開始');
       const { clinicInfo, results } = data;
+      console.log('データ:', { clinicInfo, results });
       
       // テキストベースのPDFを直接生成する方法に変更
       const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // フォント設定
+      pdf.setFont('Helvetica');
+      pdf.setFontSize(10);
       
       // タイトル
       pdf.setFontSize(18);
@@ -118,12 +127,26 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
       pdf.text(`電話: ${COMPANY_INFO.phone} | メール: ${COMPANY_INFO.email}`, 20, 285);
       pdf.text(`ウェブサイト: ${COMPANY_INFO.website}`, 20, 290);
       
-      // PDFをダウンロード
-      pdf.save(`診断結果_${clinicInfo.clinicName}.pdf`);
+      // PDFをブラウザで表示
+      console.log('PDF生成準備完了');
+      try {
+        // PDFをBlobとして出力
+        const pdfBlob = pdf.output('blob');
+        // BlobからURLを作成
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        // 新しいタブでPDFを開く
+        window.open(blobUrl, '_blank');
+        console.log('PDF生成完了、ブラウザで表示しました');
+      } catch (saveError) {
+        console.error('PDFの表示中にエラーが発生しました:', saveError);
+        throw new Error('PDFの表示中にエラーが発生しました: ' + saveError.message);
+      }
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDFの生成中にエラーが発生しました。もう一度お試しください。');
+      setError(error.message || 'PDFの生成中にエラーが発生しました');
+      alert(`PDFの生成中にエラーが発生しました: ${error.message}`);
     } finally {
+      setIsGenerating(false);
       onGenerateEnd();
     }
   };
@@ -135,12 +158,27 @@ export default function JapanesePdfGenerator({ data, onGenerateStart, onGenerate
       {/* PDF生成ボタン */}
       <button
         onClick={generatePdf}
+        disabled={isGenerating}
         className="px-8 py-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors duration-200"
       >
-        日本語PDFをダウンロード
+        {isGenerating ? (
+          <span className="flex items-center justify-center">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            PDF生成中...
+          </span>
+        ) : "日本語PDFを表示"}
       </button>
       
-      {/* HTML2Canvasを使用しないため、非表示のHTML要素は不要になりました */}
+      {/* エラーメッセージ表示 */}
+      {error && (
+        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+          <p>エラー: {error}</p>
+          <p className="text-sm mt-1">ブラウザのコンソールを確認してください</p>
+        </div>
+      )}
     </>
   );
 }
