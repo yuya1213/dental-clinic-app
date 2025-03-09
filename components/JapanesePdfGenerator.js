@@ -14,11 +14,7 @@ const COMPANY_INFO = {
 // 会社のコーポレートカラー（水色）
 const CORPORATE_COLOR = '#3498db';
 
-// 日本語フォントを動的にインポート（クライアントサイドのみ）
-const NotoSansJPFont = dynamic(
-  () => import('../public/fonts/NotoSansJP-normal'),
-  { ssr: false }
-);
+// 日本語フォントはクライアントサイドで直接読み込みます
 
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
@@ -27,21 +23,32 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
   
   // 日本語フォントを読み込む
   useEffect(() => {
-    // フォントが読み込まれたらフラグを設定
-    const loadFont = async () => {
-      try {
-        // フォントスクリプトが読み込まれるまで待機
-        await import('../public/fonts/NotoSansJP-normal');
+    // クライアントサイドでのみ実行
+    if (typeof window !== 'undefined') {
+      const script = document.createElement('script');
+      script.src = '/fonts/NotoSansJP-normal.js';
+      script.async = true;
+      script.onload = () => {
         console.log('日本語フォントを読み込みました');
         setFontLoaded(true);
-      } catch (error) {
+      };
+      script.onerror = (error) => {
         console.error('フォントの読み込みに失敗しました:', error);
         // フォントが読み込めなくても処理を続行
         setFontLoaded(true);
-      }
-    };
-    
-    loadFont();
+      };
+      document.head.appendChild(script);
+      
+      // クリーンアップ関数
+      return () => {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      };
+    } else {
+      // SSR環境ではフォント読み込みをスキップ
+      setFontLoaded(true);
+    }
   }, []);
   
   // 評価を返す関数
