@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { useState, useEffect } from 'react';
-import 'jspdf-font';
 
 // 会社情報の設定
 const COMPANY_INFO = {
@@ -15,7 +14,7 @@ const COMPANY_INFO = {
 const CORPORATE_COLOR = '#3498db';
 
 // 日本語フォントの設定
-const FONT_NAME = 'GenShinGothic';
+const FONT_NAME = 'kozgopromedium';
 const FONT_URL = 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-jp@4.5.0/files/noto-sans-jp-japanese-400-normal.woff';
 
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
@@ -23,51 +22,11 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
   const [isGenerating, setIsGenerating] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   
-  // 日本語フォントを読み込む
+  // 日本語フォントの読み込みは必要ない（jsPDFに内蔵されているフォントを使用）
   useEffect(() => {
-    // クライアントサイドでのみ実行
-    if (typeof window !== 'undefined') {
-      // フォントの読み込み処理
-      const loadFont = async () => {
-        try {
-          // フォントを取得
-          const response = await fetch(FONT_URL);
-          const fontData = await response.arrayBuffer();
-          
-          // Base64に変換
-          const base64Font = arrayBufferToBase64(fontData);
-          
-          // jsPDFにフォントを登録
-          const pdfInstance = new jsPDF();
-          pdfInstance.addFileToVFS(`${FONT_NAME}.ttf`, base64Font);
-          pdfInstance.addFont(`${FONT_NAME}.ttf`, FONT_NAME, 'normal');
-          
-          console.log('日本語フォントを読み込みました');
-          setFontLoaded(true);
-        } catch (error) {
-          console.error('フォントの読み込みに失敗しました:', error);
-          // フォントが読み込めなくても処理を続行
-          setFontLoaded(true);
-        }
-      };
-      
-      loadFont();
-    } else {
-      // SSR環境ではフォント読み込みをスキップ
-      setFontLoaded(true);
-    }
+    // フォントは既に読み込み済みとして処理を続行
+    setFontLoaded(true);
   }, []);
-  
-  // ArrayBufferをBase64に変換する関数
-  const arrayBufferToBase64 = (buffer) => {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  };
   
   // 評価を返す関数
   const getEvaluation = (score) => {
@@ -94,10 +53,12 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4'
+        format: 'a4',
+        putOnlyUsedFonts: true,
+        compress: true
       });
       
-      // 日本語フォントを設定
+      // 日本語フォントを設定（kozgopromediumは内蔵の日本語フォント）
       pdf.setFont(FONT_NAME);
       pdf.setLanguage('ja'); // 日本語設定
       
@@ -161,9 +122,12 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
           1: { cellWidth: 30, halign: 'center', font: FONT_NAME },
           2: { cellWidth: 40, halign: 'center', font: FONT_NAME },
         },
+        willDrawCell: (data) => {
+          // セルを描画する前に呼ばれるコールバック
+          pdf.setFont(FONT_NAME);
+        },
         didDrawCell: (data) => {
           // セルの描画後に呼ばれるコールバック
-          // 必要に応じてフォントを再設定
           pdf.setFont(FONT_NAME);
         }
       });
