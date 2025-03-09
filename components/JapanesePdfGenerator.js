@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 
 // 会社情報の設定
 const COMPANY_INFO = {
@@ -13,6 +14,12 @@ const COMPANY_INFO = {
 // 会社のコーポレートカラー（水色）
 const CORPORATE_COLOR = '#3498db';
 
+// 日本語フォントを動的にインポート（クライアントサイドのみ）
+const NotoSansJPFont = dynamic(
+  () => import('../public/fonts/NotoSansJP-normal'),
+  { ssr: false }
+);
+
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -20,17 +27,11 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
   
   // 日本語フォントを読み込む
   useEffect(() => {
+    // フォントが読み込まれたらフラグを設定
     const loadFont = async () => {
       try {
-        // フォントの読み込み
-        const fontResponse = await fetch('/fonts/NotoSansJP-Regular.ttf');
-        const fontData = await fontResponse.arrayBuffer();
-        
-        // フォントをjsPDFに登録
-        const fontBase64 = arrayBufferToBase64(fontData);
-        jsPDF.API.addFileToVFS('NotoSansJP-Regular.ttf', fontBase64);
-        jsPDF.API.addFont('NotoSansJP-Regular.ttf', 'NotoSansJP', 'normal');
-        
+        // フォントスクリプトが読み込まれるまで待機
+        await import('../public/fonts/NotoSansJP-normal');
         console.log('日本語フォントを読み込みました');
         setFontLoaded(true);
       } catch (error) {
@@ -42,17 +43,6 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
     
     loadFont();
   }, []);
-  
-  // ArrayBufferをBase64に変換する関数
-  const arrayBufferToBase64 = (buffer) => {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  };
   
   // 評価を返す関数
   const getEvaluation = (score) => {
@@ -84,6 +74,7 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       
       // 日本語フォントを設定
       pdf.setFont('NotoSansJP');
+      pdf.setLanguage('ja'); // 日本語設定
       
       // 1ページ目: 診断結果
       // ヘッダー
@@ -128,20 +119,28 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
           cellPadding: 3,
           lineColor: [0, 0, 0],
           lineWidth: 0.1,
+          font: 'NotoSansJP', // 明示的にフォントを指定
+          fontStyle: 'normal'
         },
         headStyles: {
           fillColor: [52, 152, 219], // コーポレートカラー
           textColor: [255, 255, 255],
           fontStyle: 'bold',
+          font: 'NotoSansJP' // ヘッダーにも明示的にフォントを指定
         },
         alternateRowStyles: {
           fillColor: [240, 240, 240],
         },
         columnStyles: {
-          0: { cellWidth: 100 },
-          1: { cellWidth: 30, halign: 'center' },
-          2: { cellWidth: 40, halign: 'center' },
+          0: { cellWidth: 100, font: 'NotoSansJP' },
+          1: { cellWidth: 30, halign: 'center', font: 'NotoSansJP' },
+          2: { cellWidth: 40, halign: 'center', font: 'NotoSansJP' },
         },
+        didDrawCell: (data) => {
+          // セルの描画後に呼ばれるコールバック
+          // 必要に応じてフォントを再設定
+          pdf.setFont('NotoSansJP');
+        }
       });
       
       // 総合評価
