@@ -1,6 +1,20 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
+// 日本語フォントの読み込み
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+// 会社情報の設定
+const COMPANY_INFO = {
+  name: '株式会社デンタルクリニック',
+  address: '東京都新宿区西新宿1-1-1',
+  phone: '03-1234-5678',
+  email: 'info@dental-clinic.example.com',
+  website: 'https://dental-clinic.example.com'
+};
+
+// クライアント側でPDFを生成するためのデータを返すAPIエンドポイント
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
@@ -13,7 +27,9 @@ export default async function handler(req, res) {
     // PDFドキュメントの作成
     const doc = new jsPDF();
     
-    // PDF生成を英語で行い、後でクライアント側で日本語表示を行うように修正
+    // 日本語フォントの設定
+    // 注: サーバーサイドでの日本語表示は制限があるため、
+    // 基本的な英語表示を行い、クライアント側で日本語表示を行う
     doc.setFont('helvetica');
     
     // ヘッダー
@@ -100,6 +116,14 @@ export default async function handler(req, res) {
       yPos += 10 * lines.length;
     });
     
+    // 会社情報
+    doc.setFontSize(10);
+    doc.text('Company Information:', 20, 250);
+    doc.text(`${COMPANY_INFO.name}`, 20, 260);
+    doc.text(`Address: ${COMPANY_INFO.address}`, 20, 270);
+    doc.text(`Phone: ${COMPANY_INFO.phone} | Email: ${COMPANY_INFO.email}`, 20, 280);
+    doc.text(`Website: ${COMPANY_INFO.website}`, 20, 290);
+    
     // フッター
     doc.setFontSize(10);
     doc.text('© 2025 Dental Clinic Management Diagnosis System', 105, 280, { align: 'center' });
@@ -107,8 +131,21 @@ export default async function handler(req, res) {
     // PDFのバイナリデータを返す
     const pdfBuffer = doc.output('arraybuffer');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Diagnosis_Result_${clinicInfo.clinicName}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="診断結果_${clinicInfo.clinicName}.pdf"`);
     res.send(Buffer.from(pdfBuffer));
+    
+    // 注: クライアント側で日本語PDFを生成する場合は、
+    // 以下のようにJSONデータを返すことも可能です
+    /*
+    res.status(200).json({
+      success: true,
+      data: {
+        clinicInfo,
+        results,
+        companyInfo: COMPANY_INFO
+      }
+    });
+    */
     
   } catch (error) {
     console.error('PDF生成エラー:', error);

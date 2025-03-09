@@ -1,9 +1,19 @@
+import { useState } from 'react';
 import { 
   Radar, RadarChart, PolarGrid, 
   PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer 
 } from 'recharts';
+import dynamic from 'next/dynamic';
 
-export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfGenerating }) {
+// クライアント側でのみ読み込むようにする（SSRを無効化）
+const JapanesePdfGenerator = dynamic(
+  () => import('./JapanesePdfGenerator'),
+  { ssr: false }
+);
+
+export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfGenerating: externalIsPdfGenerating }) {
+  // 内部でもPDF生成状態を管理する
+  const [isPdfGenerating, setIsPdfGenerating] = useState(externalIsPdfGenerating);
   const { clinicInfo, answers, results } = data;
   
   // レーダーチャートデータの生成
@@ -242,8 +252,15 @@ export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfG
               </svg>
               PDF生成中...
             </span>
-          ) : "診断結果をPDFでダウンロード"}
+          ) : "PDFをダウンロード（英語）"}
         </button>
+        
+        {/* 日本語PDF生成コンポーネント */}
+        <JapanesePdfGenerator 
+          data={data} 
+          onGenerateStart={() => setIsPdfGenerating(true)}
+          onGenerateEnd={() => setIsPdfGenerating(false)}
+        />
         
         <button
           onClick={onRestart}
