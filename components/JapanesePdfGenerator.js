@@ -1,22 +1,58 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { useState } from 'react';
-import html2canvas from 'html2canvas';
-
-
+import { useState, useEffect } from 'react';
 
 // 会社情報の設定
 const COMPANY_INFO = {
-  name: '株式会社デンタルクリニック',
-  address: '東京都新宿区西新宿1-1-1',
-  phone: '03-1234-5678',
-  email: 'info@dental-clinic.example.com',
-  website: 'https://dental-clinic.example.com'
+  name: '株式会社メディカルネット',
+  address: '東京都渋谷区幡ケ谷１丁目３４−１４ 宝ビル 3F',
+  phone: '03-5790-5261',
+  website: 'https://medicalnet-support.com/'
 };
+
+// 会社のコーポレートカラー（水色）
+const CORPORATE_COLOR = '#3498db';
 
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [fontLoaded, setFontLoaded] = useState(false);
+  
+  // 日本語フォントを読み込む
+  useEffect(() => {
+    const loadFont = async () => {
+      try {
+        // フォントの読み込み
+        const fontResponse = await fetch('/fonts/NotoSansJP-Regular.ttf');
+        const fontData = await fontResponse.arrayBuffer();
+        
+        // フォントをjsPDFに登録
+        const fontBase64 = arrayBufferToBase64(fontData);
+        jsPDF.API.addFileToVFS('NotoSansJP-Regular.ttf', fontBase64);
+        jsPDF.API.addFont('NotoSansJP-Regular.ttf', 'NotoSansJP', 'normal');
+        
+        console.log('日本語フォントを読み込みました');
+        setFontLoaded(true);
+      } catch (error) {
+        console.error('フォントの読み込みに失敗しました:', error);
+        // フォントが読み込めなくても処理を続行
+        setFontLoaded(true);
+      }
+    };
+    
+    loadFont();
+  }, []);
+  
+  // ArrayBufferをBase64に変換する関数
+  const arrayBufferToBase64 = (buffer) => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  };
   
   // 評価を返す関数
   const getEvaluation = (score) => {
@@ -39,147 +75,149 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
         throw new Error('印刷対象の要素が見つかりません');
       }
 
-      // 元のスタイルを保存
-      const originalStyles = {};
-      const elementsToEnhance = printTargetRef.current.querySelectorAll('*');
+      // PDFのサイズを設定（A4）
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
       
-      // 印刷用に一時的にスタイルを強化
-      elementsToEnhance.forEach((element, index) => {
-        // 現在のスタイルを保存
-        originalStyles[index] = {
-          color: element.style.color,
-          backgroundColor: element.style.backgroundColor,
-          borderColor: element.style.borderColor,
-          fontSize: element.style.fontSize
-        };
-        
-        // テキストの色を濃くする
-        if (window.getComputedStyle(element).color.includes('rgba') || 
-            window.getComputedStyle(element).color.includes('rgb(')) {
-          element.style.color = '#000000';
-        }
-        
-        // 背景色がある場合は濃くする
-        if (window.getComputedStyle(element).backgroundColor !== 'rgba(0, 0, 0, 0)' && 
-            window.getComputedStyle(element).backgroundColor !== 'transparent') {
-          const bgColor = window.getComputedStyle(element).backgroundColor;
-          if (bgColor.includes('rgba')) {
-            // 透明度を下げる
-            element.style.backgroundColor = bgColor.replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d\.]+\)/, 'rgba($1, $2, $3, 1)');
-          }
-        }
-        
-        // ボーダーがある場合は濃くする
-        if (window.getComputedStyle(element).borderColor !== 'rgb(0, 0, 0)' && 
-            window.getComputedStyle(element).borderWidth !== '0px') {
-          element.style.borderColor = '#000000';
+      // 日本語フォントを設定
+      pdf.setFont('NotoSansJP');
+      
+      // 1ページ目: 診断結果
+      // ヘッダー
+      pdf.setFontSize(18);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('診断結果', 105, 20, { align: 'center' });
+      
+      // クリニック情報
+      pdf.setFontSize(12);
+      pdf.text(`クリニック名: ${data.clinicInfo.name}`, 20, 40);
+      pdf.text(`診断日: ${new Date().toLocaleDateString('ja-JP')}`, 20, 50);
+      
+      // 結果テーブル
+      pdf.setFontSize(14);
+      pdf.text('診断項目の評価', 105, 70, { align: 'center' });
+      
+      // テーブルデータの準備
+      const tableData = data.results.map(item => [
+        item.category,
+        item.score.toFixed(1),
+        getEvaluation(item.score)
+      ]);
+      
+      // テーブルヘッダー
+      const tableHeaders = [['診断項目', 'スコア', '評価']];
+      
+      // テーブルの描画
+      pdf.autoTable({
+        head: tableHeaders,
+        body: tableData,
+        startY: 80,
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 3,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [52, 152, 219], // コーポレートカラー
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [240, 240, 240],
+        },
+        columnStyles: {
+          0: { cellWidth: 100 },
+          1: { cellWidth: 30, halign: 'center' },
+          2: { cellWidth: 40, halign: 'center' },
+        },
+      });
+      
+      // 総合評価
+      const totalScore = data.results.reduce((sum, item) => sum + item.score, 0) / data.results.length;
+      const totalEvaluation = getEvaluation(totalScore);
+      
+      const finalY = pdf.autoTable.previous.finalY + 20;
+      pdf.setFontSize(14);
+      pdf.text('総合評価', 105, finalY, { align: 'center' });
+      
+      pdf.setFontSize(12);
+      pdf.text(`総合スコア: ${totalScore.toFixed(1)}`, 20, finalY + 15);
+      pdf.text(`評価: ${totalEvaluation}`, 20, finalY + 25);
+      
+      // アドバイス
+      pdf.setFontSize(14);
+      pdf.text('改善アドバイス', 105, finalY + 45, { align: 'center' });
+      
+      pdf.setFontSize(10);
+      let adviceY = finalY + 55;
+      data.results.forEach(item => {
+        if (item.score < 3) {
+          pdf.text(`${item.category}: ${item.advice || '改善が必要です。'}`, 20, adviceY);
+          adviceY += 10;
         }
       });
-
-      // 会社情報の準備
-      const companyInfoHtml = `
-        <div style="font-family: sans-serif; font-size: 10px; padding: 10px; border-top: 1px solid #000; margin-top: 10px;">
-          <p style="margin: 2px 0; color: #000;"><strong>会社情報:</strong></p>
-          <p style="margin: 2px 0; color: #000;">${COMPANY_INFO.name}</p>
-          <p style="margin: 2px 0; color: #000;">住所: ${COMPANY_INFO.address}</p>
-          <p style="margin: 2px 0; color: #000;">電話: ${COMPANY_INFO.phone} | メール: ${COMPANY_INFO.email}</p>
-          <p style="margin: 2px 0; color: #000;">ウェブサイト: ${COMPANY_INFO.website}</p>
-        </div>
-      `;
       
-      // 会社情報を表示するための一時的な要素を作成
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = companyInfoHtml;
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.bottom = '0';
-      tempDiv.style.width = '100%';
-      tempDiv.style.backgroundColor = 'white';
-      tempDiv.style.color = '#000000';
+      // 2ページ目: 会社情報
+      pdf.addPage();
       
-      // 一時的な要素を追加
-      printTargetRef.current.appendChild(tempDiv);
+      // ヘッダー
+      pdf.setFontSize(16);
+      pdf.setTextColor(52, 152, 219); // コーポレートカラー
+      pdf.text('株式会社メディカルネット', 105, 30, { align: 'center' });
       
-      // 元のサイズを保存
-      const originalWidth = printTargetRef.current.style.width;
-      const originalHeight = printTargetRef.current.style.height;
-      const originalMaxWidth = printTargetRef.current.style.maxWidth;
+      // 会社ロゴの代わりに会社名を大きく表示
+      pdf.setFontSize(24);
+      pdf.text('Medical Net', 105, 50, { align: 'center' });
       
-      // 1ページに収まるようにサイズを調整
-      printTargetRef.current.style.width = '210mm';
-      printTargetRef.current.style.maxWidth = '210mm';
+      // 会社情報
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('会社情報', 105, 80, { align: 'center' });
       
-      console.log('HTML要素のキャプチャを開始');
+      pdf.setFontSize(10);
+      pdf.text(`会社名: ${COMPANY_INFO.name}`, 40, 100);
+      pdf.text(`住所: ${COMPANY_INFO.address}`, 40, 110);
+      pdf.text(`電話: ${COMPANY_INFO.phone}`, 40, 120);
+      pdf.text(`ウェブサイト: ${COMPANY_INFO.website}`, 40, 130);
       
-      try {
-        // HTML要素をキャンバスに変換
-        const canvas = await html2canvas(printTargetRef.current, {
-          scale: 1.5, // 解像度調整（1ページに収まるように調整）
-          useCORS: true, // 外部リソースを許可
-          logging: false, // ログを無効化
-          backgroundColor: '#ffffff', // 背景色を白に
-          scrollY: -window.scrollY, // スクロール位置を考慮
-          windowWidth: 1000, // 固定幅を設定
-          windowHeight: 1414, // A4比率に合わせた高さ
-          imageTimeout: 0, // 画像読み込みタイムアウトなし
-          onclone: (clonedDoc) => {
-            // クローンされたドキュメントのスタイルを強化
-            const clonedElement = clonedDoc.querySelector('[data-html2canvas-ignore="true"]');
-            if (clonedElement) {
-              clonedElement.style.display = 'none';
-            }
-          }
-        });
-        
-        // キャンバスからイメージデータを取得（品質を上げる）
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        
-        // PDFのサイズを設定（A4）
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-        
-        // キャンバスの縦横比を計算（1ページに収まるように調整）
-        const imgWidth = 210; // A4の幅（mm）
-        const pageHeight = 297; // A4の高さ（mm）
-        const imgHeight = Math.min((canvas.height * imgWidth) / canvas.width, pageHeight);
-        
-        // イメージをPDFに追加（位置調整）
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-        
-        // PDFをブラウザで表示
-        console.log('PDF生成準備完了');
-        
-        // PDFをBlobとして出力
-        const pdfBlob = pdf.output('blob');
-        // BlobからURLを作成
-        const blobUrl = URL.createObjectURL(pdfBlob);
-        // 新しいタブでPDFを開く
-        window.open(blobUrl, '_blank');
-        console.log('PDF生成完了、ブラウザで表示しました');
-      } catch (captureError) {
-        console.error('HTML要素のキャプチャ中にエラーが発生しました:', captureError);
-        throw new Error('HTML要素のキャプチャ中にエラーが発生しました: ' + captureError.message);
-      } finally {
-        // 元のスタイルを復元
-        elementsToEnhance.forEach((element, index) => {
-          element.style.color = originalStyles[index].color;
-          element.style.backgroundColor = originalStyles[index].backgroundColor;
-          element.style.borderColor = originalStyles[index].borderColor;
-          element.style.fontSize = originalStyles[index].fontSize;
-        });
-        
-        // 元のサイズを復元
-        printTargetRef.current.style.width = originalWidth;
-        printTargetRef.current.style.height = originalHeight;
-        printTargetRef.current.style.maxWidth = originalMaxWidth;
-        
-        // 一時的な要素を削除
-        if (tempDiv && tempDiv.parentNode) {
-          tempDiv.parentNode.removeChild(tempDiv);
-        }
-      }
+      // 会社概要
+      pdf.setFontSize(12);
+      pdf.text('会社概要', 105, 160, { align: 'center' });
+      
+      pdf.setFontSize(10);
+      const description = [
+        '株式会社メディカルネットは、歯科医院の経営サポートを',
+        '専門とする企業です。診断ツールの提供、マーケティング支援、',
+        '経営コンサルティングなど、歯科医院の成長と発展をサポート',
+        'するさまざまなサービスを提供しています。'
+      ];
+      
+      let descY = 180;
+      description.forEach(line => {
+        pdf.text(line, 40, descY);
+        descY += 10;
+      });
+      
+      // フッター
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('© 2025 株式会社メディカルネット All Rights Reserved.', 105, 280, { align: 'center' });
+      
+      // PDFをブラウザで表示
+      console.log('PDF生成準備完了');
+      
+      // PDFをBlobとして出力
+      const pdfBlob = pdf.output('blob');
+      // BlobからURLを作成
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      // 新しいタブでPDFを開く
+      window.open(blobUrl, '_blank');
+      console.log('PDF生成完了、ブラウザで表示しました');
     } catch (error) {
       console.error('PDF生成エラー:', error);
       setError(error.message || 'PDFの生成中にエラーが発生しました');
