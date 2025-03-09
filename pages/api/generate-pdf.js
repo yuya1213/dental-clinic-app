@@ -13,41 +13,41 @@ export default async function handler(req, res) {
     // PDFドキュメントの作成
     const doc = new jsPDF();
     
-    // 日本語フォントの設定
-    // 注: 実際のデプロイでは日本語フォントを追加する必要があります
+    // PDF生成を英語で行い、後でクライアント側で日本語表示を行うように修正
+    doc.setFont('helvetica');
     
     // ヘッダー
     doc.setFontSize(20);
-    doc.text('歯科医院経営診断結果', 105, 20, { align: 'center' });
+    doc.text('Dental Clinic Management Diagnosis', 105, 20, { align: 'center' });
     
     // 医院情報
     doc.setFontSize(14);
-    doc.text('医院情報', 20, 40);
+    doc.text('Clinic Information', 20, 40);
     
     doc.setFontSize(12);
-    doc.text(`医院名: ${clinicInfo.clinicName}`, 30, 50);
-    doc.text(`回答者: ${clinicInfo.respondentName}`, 30, 60);
-    doc.text(`診断日: ${new Date(clinicInfo.date).toLocaleDateString('ja-JP')}`, 30, 70);
+    doc.text(`Clinic: ${clinicInfo.clinicName}`, 30, 50);
+    doc.text(`Respondent: ${clinicInfo.respondentName}`, 30, 60);
+    doc.text(`Date: ${new Date(clinicInfo.date).toLocaleDateString('en-US')}`, 30, 70);
     
     // 診断結果概要
     doc.setFontSize(14);
-    doc.text('診断結果概要', 20, 90);
+    doc.text('Diagnosis Summary', 20, 90);
     
     doc.setFontSize(12);
-    doc.text(`総合評価: ${results.status}`, 30, 100);
-    doc.text(`全20問中 ${results.totalYes}問が「はい」`, 30, 110);
+    doc.text(`Overall Rating: ${results.status}`, 30, 100);
+    doc.text(`${results.totalYes} out of 20 questions answered "Yes"`, 30, 110);
     
     // カテゴリ別スコア
     doc.setFontSize(14);
-    doc.text('カテゴリ別スコア', 20, 130);
+    doc.text('Category Scores', 20, 130);
     
     // テーブルデータの作成
     const tableData = [
-      ['カテゴリ', 'スコア', '評価'],
-      ['財務管理', `${results.categories.finance}/5`, getEvaluation(results.categories.finance)],
-      ['患者数・売上', `${results.categories.patients}/5`, getEvaluation(results.categories.patients)],
-      ['スタッフ管理', `${results.categories.staff}/5`, getEvaluation(results.categories.staff)],
-      ['患者満足度', `${results.categories.satisfaction}/5`, getEvaluation(results.categories.satisfaction)]
+      ['Category', 'Score', 'Evaluation'],
+      ['Financial Management', `${results.categories.finance}/5`, getEvaluationInEnglish(results.categories.finance)],
+      ['Patient Numbers & Sales', `${results.categories.patients}/5`, getEvaluationInEnglish(results.categories.patients)],
+      ['Staff Management', `${results.categories.staff}/5`, getEvaluationInEnglish(results.categories.staff)],
+      ['Patient Satisfaction', `${results.categories.satisfaction}/5`, getEvaluationInEnglish(results.categories.satisfaction)]
     ];
     
     // テーブルの描画
@@ -69,28 +69,28 @@ export default async function handler(req, res) {
     
     // 改善アドバイス
     doc.setFontSize(14);
-    doc.text('改善アドバイス', 20, doc.autoTable.previous.finalY + 20);
+    doc.text('Improvement Advice', 20, doc.autoTable.previous.finalY + 20);
     
     // カテゴリ別アドバイス
     let yPos = doc.autoTable.previous.finalY + 30;
     const adviceList = [];
     
     if (results.categories.finance < 3) {
-      adviceList.push('【財務管理】毎月の収支を正確に把握し、3ヶ月先の資金計画を立てましょう。税理士などの専門家と定期的に相談することをお勧めします。');
+      adviceList.push('[Financial Management] Track monthly income and expenses accurately, and create a financial plan for the next 3 months. We recommend consulting with a tax accountant regularly.');
     }
     if (results.categories.patients < 3) {
-      adviceList.push('【患者数・売上】新規患者とリピーターの比率分析、リコール率の向上に取り組みましょう。自由診療の提案方法も見直すと良いでしょう。');
+      adviceList.push('[Patient Numbers & Sales] Analyze the ratio of new patients to repeat patients, and work on improving recall rates. It would also be good to review how you propose elective treatments.');
     }
     if (results.categories.staff < 3) {
-      adviceList.push('【スタッフ管理】給与体系の見直しと教育研修の充実を図りましょう。労務トラブルの対応マニュアルも整備すると安心です。');
+      adviceList.push('[Staff Management] Review the salary system and enhance educational training. It is also reassuring to prepare a manual for dealing with labor issues.');
     }
     if (results.categories.satisfaction < 3) {
-      adviceList.push('【患者満足度】口コミ対策と院内環境の整備を優先し、定期的な患者アンケートを実施して改善に活かしましょう。');
+      adviceList.push('[Patient Satisfaction] Prioritize review management and clinic environment improvements, and conduct regular patient surveys to make improvements.');
     }
     
     // アドバイスがない場合
     if (adviceList.length === 0) {
-      adviceList.push('全てのカテゴリで良好な結果です。現状を維持しながら、さらなる向上を目指しましょう。');
+      adviceList.push('Good results in all categories. Maintain the current status while aiming for further improvement.');
     }
     
     // アドバイスの描画
@@ -102,12 +102,12 @@ export default async function handler(req, res) {
     
     // フッター
     doc.setFontSize(10);
-    doc.text('© 2025 歯科医院経営診断システム', 105, 280, { align: 'center' });
+    doc.text('© 2025 Dental Clinic Management Diagnosis System', 105, 280, { align: 'center' });
     
     // PDFのバイナリデータを返す
     const pdfBuffer = doc.output('arraybuffer');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="診断結果_${clinicInfo.clinicName}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Diagnosis_Result_${clinicInfo.clinicName}.pdf"`);
     res.send(Buffer.from(pdfBuffer));
     
   } catch (error) {
@@ -125,4 +125,12 @@ function getEvaluation(score) {
   if (score >= 3) return '良好';
   if (score >= 2) return '要改善';
   return '要注意';
+}
+
+// 英語での評価を返す関数
+function getEvaluationInEnglish(score) {
+  if (score >= 4) return 'Excellent';
+  if (score >= 3) return 'Good';
+  if (score >= 2) return 'Needs Improvement';
+  return 'Caution';
 }
