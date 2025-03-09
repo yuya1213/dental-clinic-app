@@ -101,7 +101,14 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       pdf.text('診断項目の評価', 105, 70, { align: 'center' });
       
       // テーブルデータの準備
-      const tableData = data.results.map(item => [
+      const categories = [
+        { category: '財務管理', score: data.results.categories.finance },
+        { category: '患者数', score: data.results.categories.patients },
+        { category: 'スタッフ管理', score: data.results.categories.staff },
+        { category: '満足度', score: data.results.categories.satisfaction }
+      ];
+      
+      const tableData = categories.map(item => [
         item.category,
         item.score.toFixed(1),
         getEvaluation(item.score)
@@ -138,7 +145,8 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       });
       
       // 総合評価
-      const totalScore = data.results.reduce((sum, item) => sum + item.score, 0) / data.results.length;
+      const scores = Object.values(data.results.categories);
+      const totalScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
       const totalEvaluation = getEvaluation(totalScore);
       
       const finalY = pdf.autoTable.previous.finalY + 20;
@@ -155,12 +163,30 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       
       pdf.setFontSize(10);
       let adviceY = finalY + 55;
-      data.results.forEach(item => {
-        if (item.score < 3) {
-          pdf.text(`${item.category}: ${item.advice || '改善が必要です。'}`, 20, adviceY);
-          adviceY += 10;
-        }
+      
+      // カテゴリ別アドバイス
+      const categoryAdvice = [];
+      if (data.results.categories.finance < 3) {
+        categoryAdvice.push("【財務管理】毎月の収支を正確に把握し、3ヶ月先の資金計画を立てましょう。税理士などの専門家と定期的に相談することをお勧めします。");
+      }
+      if (data.results.categories.patients < 3) {
+        categoryAdvice.push("【患者数・売上】新規患者とリピーターの比率分析、リコール率の向上に取り組みましょう。自由診療の提案方法も見直すと良いでしょう。");
+      }
+      if (data.results.categories.staff < 3) {
+        categoryAdvice.push("【スタッフ管理】給与体系の見直しと教育研修の充実を図りましょう。労務トラブルの対応マニュアルも整備すると安心です。");
+      }
+      if (data.results.categories.satisfaction < 3) {
+        categoryAdvice.push("【患者満足度】口コミ対策と院内環境の整備を優先し、定期的な患者アンケートを実施して改善に活かしましょう。");
+      }
+      
+      categoryAdvice.forEach(advice => {
+        pdf.text(advice, 20, adviceY);
+        adviceY += 10;
       });
+      
+      if (categoryAdvice.length === 0) {
+        pdf.text("すべての項目で良好な結果です。現状を維持しながら、さらなる向上を目指しましょう。", 20, adviceY);
+      }
       
       // 2ページ目: 会社情報
       pdf.addPage();
