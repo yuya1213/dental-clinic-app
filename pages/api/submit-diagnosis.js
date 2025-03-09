@@ -28,9 +28,16 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('診断結果の送信エラー:', error);
+    
+    // より詳細なエラーメッセージを提供
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `診断結果の送信中にエラーが発生しました: ${error.message}` 
+      : '診断結果の送信中にエラーが発生しました。もう一度お試しください。';
+    
     return res.status(500).json({ 
       success: false, 
-      message: '診断結果の送信中にエラーが発生しました'
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.toString() : undefined
     });
   }
 } 
