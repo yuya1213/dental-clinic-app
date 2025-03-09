@@ -39,14 +39,51 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
         throw new Error('印刷対象の要素が見つかりません');
       }
 
+      // 元のスタイルを保存
+      const originalStyles = {};
+      const elementsToEnhance = printTargetRef.current.querySelectorAll('*');
+      
+      // 印刷用に一時的にスタイルを強化
+      elementsToEnhance.forEach((element, index) => {
+        // 現在のスタイルを保存
+        originalStyles[index] = {
+          color: element.style.color,
+          backgroundColor: element.style.backgroundColor,
+          borderColor: element.style.borderColor,
+          fontSize: element.style.fontSize
+        };
+        
+        // テキストの色を濃くする
+        if (window.getComputedStyle(element).color.includes('rgba') || 
+            window.getComputedStyle(element).color.includes('rgb(')) {
+          element.style.color = '#000000';
+        }
+        
+        // 背景色がある場合は濃くする
+        if (window.getComputedStyle(element).backgroundColor !== 'rgba(0, 0, 0, 0)' && 
+            window.getComputedStyle(element).backgroundColor !== 'transparent') {
+          const bgColor = window.getComputedStyle(element).backgroundColor;
+          if (bgColor.includes('rgba')) {
+            // 透明度を下げる
+            element.style.backgroundColor = bgColor.replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d\.]+\)/, 'rgba($1, $2, $3, 1)');
+          }
+        }
+        
+        // ボーダーがある場合は濃くする
+        if (window.getComputedStyle(element).borderColor !== 'rgb(0, 0, 0)' && 
+            window.getComputedStyle(element).borderWidth !== '0px') {
+          element.style.borderColor = '#000000';
+        }
+      });
+
       // 会社情報の準備
       const companyInfoHtml = `
-        <div style="font-family: sans-serif; font-size: 10px; padding: 10px; border-top: 1px solid #eee; margin-top: 20px;">
-          <p><strong>会社情報:</strong></p>
-          <p>${COMPANY_INFO.name}</p>
-          <p>住所: ${COMPANY_INFO.address}</p>
-          <p>電話: ${COMPANY_INFO.phone} | メール: ${COMPANY_INFO.email}</p>
-          <p>ウェブサイト: ${COMPANY_INFO.website}</p>
+        <div style="font-family: sans-serif; font-size: 10px; padding: 10px; border-top: 1px solid #000; margin-top: 10px;">
+          <p style="margin: 2px 0; color: #000;"><strong>会社情報:</strong></p>
+          <p style="margin: 2px 0; color: #000;">${COMPANY_INFO.name}</p>
+          <p style="margin: 2px 0; color: #000;">住所: ${COMPANY_INFO.address}</p>
+          <p style="margin: 2px 0; color: #000;">電話: ${COMPANY_INFO.phone} | メール: ${COMPANY_INFO.email}</p>
+          <p style="margin: 2px 0; color: #000;">ウェブサイト: ${COMPANY_INFO.website}</p>
         </div>
       `;
       
@@ -57,24 +94,44 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       tempDiv.style.bottom = '0';
       tempDiv.style.width = '100%';
       tempDiv.style.backgroundColor = 'white';
+      tempDiv.style.color = '#000000';
       
       // 一時的な要素を追加
       printTargetRef.current.appendChild(tempDiv);
+      
+      // 元のサイズを保存
+      const originalWidth = printTargetRef.current.style.width;
+      const originalHeight = printTargetRef.current.style.height;
+      const originalMaxWidth = printTargetRef.current.style.maxWidth;
+      
+      // 1ページに収まるようにサイズを調整
+      printTargetRef.current.style.width = '210mm';
+      printTargetRef.current.style.maxWidth = '210mm';
       
       console.log('HTML要素のキャプチャを開始');
       
       try {
         // HTML要素をキャンバスに変換
         const canvas = await html2canvas(printTargetRef.current, {
-          scale: 2, // 高解像度
+          scale: 1.5, // 解像度調整（1ページに収まるように調整）
           useCORS: true, // 外部リソースを許可
           logging: false, // ログを無効化
           backgroundColor: '#ffffff', // 背景色を白に
-          scrollY: -window.scrollY // スクロール位置を考慮
+          scrollY: -window.scrollY, // スクロール位置を考慮
+          windowWidth: 1000, // 固定幅を設定
+          windowHeight: 1414, // A4比率に合わせた高さ
+          imageTimeout: 0, // 画像読み込みタイムアウトなし
+          onclone: (clonedDoc) => {
+            // クローンされたドキュメントのスタイルを強化
+            const clonedElement = clonedDoc.querySelector('[data-html2canvas-ignore="true"]');
+            if (clonedElement) {
+              clonedElement.style.display = 'none';
+            }
+          }
         });
         
-        // キャンバスからイメージデータを取得
-        const imgData = canvas.toDataURL('image/png');
+        // キャンバスからイメージデータを取得（品質を上げる）
+        const imgData = canvas.toDataURL('image/png', 1.0);
         
         // PDFのサイズを設定（A4）
         const pdf = new jsPDF({
@@ -83,11 +140,12 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
           format: 'a4'
         });
         
-        // キャンバスの縦横比を計算
+        // キャンバスの縦横比を計算（1ページに収まるように調整）
         const imgWidth = 210; // A4の幅（mm）
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const pageHeight = 297; // A4の高さ（mm）
+        const imgHeight = Math.min((canvas.height * imgWidth) / canvas.width, pageHeight);
         
-        // イメージをPDFに追加
+        // イメージをPDFに追加（位置調整）
         pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
         
         // PDFをブラウザで表示
@@ -104,6 +162,19 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
         console.error('HTML要素のキャプチャ中にエラーが発生しました:', captureError);
         throw new Error('HTML要素のキャプチャ中にエラーが発生しました: ' + captureError.message);
       } finally {
+        // 元のスタイルを復元
+        elementsToEnhance.forEach((element, index) => {
+          element.style.color = originalStyles[index].color;
+          element.style.backgroundColor = originalStyles[index].backgroundColor;
+          element.style.borderColor = originalStyles[index].borderColor;
+          element.style.fontSize = originalStyles[index].fontSize;
+        });
+        
+        // 元のサイズを復元
+        printTargetRef.current.style.width = originalWidth;
+        printTargetRef.current.style.height = originalHeight;
+        printTargetRef.current.style.maxWidth = originalMaxWidth;
+        
         // 一時的な要素を削除
         if (tempDiv && tempDiv.parentNode) {
           tempDiv.parentNode.removeChild(tempDiv);
