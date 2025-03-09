@@ -1,40 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# 歯科医院経営診断アプリ (Dental Clinic App)
 
-## Getting Started
+歯科医院の経営状態を診断し、改善提案を行うWebアプリケーションです。
 
-First, run the development server:
+## 機能
+
+- 20の質問に回答することで、医院の経営状態を診断
+- 財務管理、患者数・売上、スタッフ管理、患者満足度の4カテゴリで評価
+- レーダーチャートによる視覚的な経営バランス分析
+- 診断結果のPDFダウンロード機能
+- 診断データのデータベース保存機能
+
+## 技術スタック
+
+- **フロントエンド**: Next.js, React, Tailwind CSS, Recharts
+- **バックエンド**: Next.js API Routes
+- **データベース**: MongoDB
+- **PDF生成**: jsPDF, jsPDF-AutoTable
+
+## 開発環境のセットアップ
 
 ```bash
+# 依存関係のインストール
+npm install
+
+# 開発サーバーの起動
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで [http://localhost:3000](http://localhost:3000) を開いて結果を確認できます。
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+## デプロイ
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+Vercelを使用して簡単にデプロイできます：
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+1. GitHubリポジトリにプッシュ
+2. Vercelでプロジェクトをインポート
+3. 環境変数（MONGODB_URI）を設定
+4. デプロイボタンをクリック
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 環境変数
 
-## Learn More
+`.env.local`ファイルに以下の環境変数を設定してください：
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+```
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-url>/?retryWrites=true&w=majority
+```
