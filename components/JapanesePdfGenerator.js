@@ -12,16 +12,56 @@ const PDF_OPTIONS = {
 };
 
 const CANVAS_OPTIONS = {
-  scale: 2, // 高解像度
+  scale: 3, // 高解像度を上げる
   useCORS: true, // クロスオリジン対応
   logging: false, // ログを無効化
   allowTaint: true, // 外部リソースを許可
-  backgroundColor: '#ffffff' // 背景色を白に設定
+  backgroundColor: '#ffffff', // 背景色を白に設定
+  imageTimeout: 0, // 画像のロードタイムアウトを無効化
+  removeContainer: true, // 一時的なコンテナを削除
+  letterRendering: true, // 文字を個別にレンダリング
+  foreignObjectRendering: false // foreignObjectを使用しない
 };
 
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // プリント前に要素のスタイルを調整する関数
+  const prepareElementForPrinting = (element) => {
+    // 元のスタイルを保存
+    const originalStyles = {};
+    const elementsToStyle = element.querySelectorAll('*');
+    
+    // すべてのテキスト要素の色を濃くする
+    elementsToStyle.forEach((el, index) => {
+      // テキスト要素のみ対象
+      if (el.innerText && el.innerText.trim().length > 0) {
+        originalStyles[index] = {
+          color: el.style.color,
+          fontWeight: el.style.fontWeight,
+          textShadow: el.style.textShadow
+        };
+        
+        // 色を濃くし、フォントを太くする
+        el.style.color = '#000000';
+        el.style.fontWeight = 'bold';
+        // テキストにシャドウを追加して読みやすくする
+        el.style.textShadow = '0 0 0 #000';
+      }
+    });
+    
+    return () => {
+      // 元のスタイルに戻す
+      elementsToStyle.forEach((el, index) => {
+        if (originalStyles[index]) {
+          el.style.color = originalStyles[index].color;
+          el.style.fontWeight = originalStyles[index].fontWeight;
+          el.style.textShadow = originalStyles[index].textShadow;
+        }
+      });
+    };
+  };
   
   // HTML要素をキャンバスに変換してPDFを生成する関数
   const generatePdf = async () => {
@@ -35,21 +75,28 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       if (!printTargetRef || !printTargetRef.current) {
         throw new Error('印刷対象の要素が見つかりません');
       }
-
+      
+      // プリント前に要素のスタイルを調整
+      const restoreStyles = prepareElementForPrinting(printTargetRef.current);
+      
       // HTML要素をキャンバスに変換
       const canvas = await html2canvas(printTargetRef.current, CANVAS_OPTIONS);
       console.log('HTML要素をキャンバスに変換しました');
       
+      // スタイルを元に戻す
+      restoreStyles();
+      
       // PDFを生成
       const pdf = new jsPDF(PDF_OPTIONS);
       
-      // キャンバスをイメージとしてPDFに追加
-      const imgData = canvas.toDataURL('image/png');
+      // キャンバスを高品質のPNGとしてPDFに追加
+      const imgData = canvas.toDataURL('image/png', 1.0); // 最高品質
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // コントラストを高めるための設定
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       console.log('キャンバスをPDFに追加しました');
       
       // PDFをブラウザで表示
@@ -79,13 +126,19 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       if (!printTargetRef || !printTargetRef.current) {
         throw new Error('印刷対象の要素が見つかりません');
       }
+      
+      // プリント前に要素のスタイルを調整
+      const restoreStyles = prepareElementForPrinting(printTargetRef.current);
 
       // HTML要素をキャンバスに変換
       const canvas = await html2canvas(printTargetRef.current, CANVAS_OPTIONS);
       console.log('HTML要素をキャンバスに変換しました');
       
-      // キャンバスを画像としてダウンロード
-      const imgData = canvas.toDataURL('image/png');
+      // スタイルを元に戻す
+      restoreStyles();
+      
+      // キャンバスを高品質の画像としてダウンロード
+      const imgData = canvas.toDataURL('image/png', 1.0); // 最高品質
       const link = document.createElement('a');
       link.href = imgData;
       link.download = `診断結果_${new Date().toISOString().slice(0, 10)}.png`;
