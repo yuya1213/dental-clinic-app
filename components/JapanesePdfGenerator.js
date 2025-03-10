@@ -8,11 +8,11 @@ const PDF_OPTIONS = {
   orientation: 'portrait',
   unit: 'mm',
   format: 'a4',
-  compress: true
+  compress: false // 圧縮を無効化して品質を向上
 };
 
 const CANVAS_OPTIONS = {
-  scale: 4, // より高解像度に設定
+  scale: 3, // 高解像度に設定（2〜5の間が推奨）
   useCORS: true, // クロスオリジン対応
   logging: false, // ログを無効化
   allowTaint: true, // 外部リソースを許可
@@ -28,6 +28,8 @@ const CANVAS_OPTIONS = {
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+
   
   // プリント前に要素のスタイルを調整する関数（コントラスト強化版）
   const prepareElementForPrinting = (element) => {
@@ -56,7 +58,8 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
         textShadow: el.style.textShadow,
         backgroundColor: el.style.backgroundColor,
         borderColor: el.style.borderColor,
-        opacity: el.style.opacity
+        opacity: el.style.opacity,
+        filter: el.style.filter
       };
       
       // テキスト要素の処理
@@ -66,6 +69,7 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
         el.style.fontWeight = '900'; // 最も太いフォント
         el.style.textShadow = 'none'; // シャドウを削除してクリアに
         el.style.opacity = '1'; // 完全に不透明に
+        el.style.filter = 'contrast(1.2) saturate(1.5)'; // コントラストと彩度を上げる
       }
       
       // 背景色を持つ要素は、より濃い色に
@@ -103,6 +107,7 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
           el.style.backgroundColor = originalStyles[index].backgroundColor;
           el.style.borderColor = originalStyles[index].borderColor;
           el.style.opacity = originalStyles[index].opacity;
+          el.style.filter = originalStyles[index].filter;
         }
       });
     };
@@ -154,6 +159,37 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       // 日本語フォントを設定
       pdf.setFont('kozgopromedium', 'normal');
       
+      // キャンバスの処理 - コントラストを強化
+      const ctx = canvas.getContext('2d');
+      
+      // コントラストを高める処理
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      // 各ピクセルの色を強化
+      for (let i = 0; i < data.length; i += 4) {
+        // RGB値を取得
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // 色の濃さを増す
+        data[i] = Math.min(r * 1.2, 255);     // Rを増強
+        data[i + 1] = Math.min(g * 1.2, 255); // Gを増強
+        data[i + 2] = Math.min(b * 1.2, 255); // Bを増強
+      }
+      
+      // 変更したデータをキャンバスに書き戻す
+      ctx.putImageData(imageData, 0, 0);
+      
+      // さらにオーバーレイでコントラストを強化
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 元の合成モードに戻す
+      ctx.globalCompositeOperation = 'source-over';
+      
       // キャンバスを高品質のPNGとしてPDFに追加
       const imgData = canvas.toDataURL('image/png', 1.0); // 最高品質
       const imgProps = pdf.getImageProperties(imgData);
@@ -161,6 +197,9 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
       // コントラストを高めるための設定
+      // 日本語フォントを再設定（重要）
+      pdf.setFont('kozgopromedium', 'normal');
+      
       // 圧縮なしで高品質画像を追加
       pdf.addImage({
         imageData: imgData,
@@ -173,6 +212,9 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
         rotation: 0,
         mask: false
       });
+      
+      // 日本語フォントを再度確認
+      pdf.setFont('kozgopromedium', 'normal');
       console.log('キャンバスをPDFに追加しました');
       
       // PDFをブラウザで表示
@@ -229,6 +271,37 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       
       // スタイルを元に戻す
       restoreStyles();
+      
+      // キャンバスの処理 - コントラストを強化
+      const ctx = canvas.getContext('2d');
+      
+      // コントラストを高める処理
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      // 各ピクセルの色を強化
+      for (let i = 0; i < data.length; i += 4) {
+        // RGB値を取得
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // 色の濃さを増す
+        data[i] = Math.min(r * 1.2, 255);     // Rを増強
+        data[i + 1] = Math.min(g * 1.2, 255); // Gを増強
+        data[i + 2] = Math.min(b * 1.2, 255); // Bを増強
+      }
+      
+      // 変更したデータをキャンバスに書き戻す
+      ctx.putImageData(imageData, 0, 0);
+      
+      // さらにオーバーレイでコントラストを強化
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 元の合成モードに戻す
+      ctx.globalCompositeOperation = 'source-over';
       
       // キャンバスを高品質の画像としてダウンロード
       const imgData = canvas.toDataURL('image/png', 1.0); // 最高品質
