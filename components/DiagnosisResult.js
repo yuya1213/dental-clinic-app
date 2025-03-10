@@ -6,8 +6,8 @@ import {
 import dynamic from 'next/dynamic';
 
 // クライアント側でのみ読み込むようにする（SSRを無効化）
-const JapanesePdfGenerator = dynamic(
-  () => import('./JapanesePdfGenerator'),
+const ImageDownloader = dynamic(
+  () => import('./ImageDownloader'),
   { ssr: false }
 );
 
@@ -250,8 +250,8 @@ export default function DiagnosisResult({ data, onRestart, onDownloadPdf, isPdfG
       )}
       
       <div className="flex flex-col md:flex-row justify-center gap-6 mt-10">
-        {/* 日本語PDF生成コンポーネント */}
-        <JapanesePdfGenerator 
+        {/* 画像ダウンロードコンポーネント */}
+        <ImageDownloader 
           data={data} 
           printTargetRef={printTargetRef}
           onGenerateStart={() => setIsPdfGenerating(true)}
