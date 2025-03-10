@@ -119,6 +119,8 @@ export default function ClinicForm({ onSubmit, isSubmitting }) {
                   className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none focus:ring-0"
                   placeholder="例：○○歯科クリニック"
                   required
+                  autoComplete="off"
+                  style={{ color: '#000000' }} // 文字色を明示的に黒に設定
                 />
               </div>
             </div>
@@ -141,6 +143,8 @@ export default function ClinicForm({ onSubmit, isSubmitting }) {
                   className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none focus:ring-0"
                   placeholder="例：山田 太郎"
                   required
+                  autoComplete="off"
+                  style={{ color: '#000000' }}
                 />
               </div>
             </div>
@@ -163,6 +167,8 @@ export default function ClinicForm({ onSubmit, isSubmitting }) {
                   className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none focus:ring-0"
                   placeholder="例：info@example.com"
                   required
+                  autoComplete="off"
+                  style={{ color: '#000000' }}
                 />
               </div>
             </div>
@@ -184,6 +190,8 @@ export default function ClinicForm({ onSubmit, isSubmitting }) {
                   onChange={handleInfoChange}
                   className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none focus:ring-0"
                   required
+                  autoComplete="off"
+                  style={{ color: '#000000' }}
                 />
                 <div className="px-4 py-3 text-gray-700 font-medium">
                   {clinicInfo.date && formatDateJP(clinicInfo.date)}
