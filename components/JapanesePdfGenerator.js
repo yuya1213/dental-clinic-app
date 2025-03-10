@@ -12,7 +12,7 @@ const PDF_OPTIONS = {
 };
 
 const CANVAS_OPTIONS = {
-  scale: 3, // 高解像度を上げる
+  scale: 4, // より高解像度に設定
   useCORS: true, // クロスオリジン対応
   logging: false, // ログを無効化
   allowTaint: true, // 外部リソースを許可
@@ -20,44 +20,89 @@ const CANVAS_OPTIONS = {
   imageTimeout: 0, // 画像のロードタイムアウトを無効化
   removeContainer: true, // 一時的なコンテナを削除
   letterRendering: true, // 文字を個別にレンダリング
-  foreignObjectRendering: false // foreignObjectを使用しない
+  foreignObjectRendering: false, // foreignObjectを使用しない
+  windowWidth: 1200, // 幅を固定して一貫性を確保
+  windowHeight: 1600 // 高さを固定して一貫性を確保
 };
 
 export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateStart, onGenerateEnd }) {
   const [error, setError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // プリント前に要素のスタイルを調整する関数
+  // プリント前に要素のスタイルを調整する関数（コントラスト強化版）
   const prepareElementForPrinting = (element) => {
     // 元のスタイルを保存
     const originalStyles = {};
     const elementsToStyle = element.querySelectorAll('*');
     
-    // すべてのテキスト要素の色を濃くする
+    // 全体のコンテナスタイルを調整
+    const originalContainerStyle = {
+      backgroundColor: element.style.backgroundColor,
+      border: element.style.border,
+      boxShadow: element.style.boxShadow
+    };
+    
+    // コンテナの背景を真っ白に、境界線をはっきりさせる
+    element.style.backgroundColor = '#ffffff';
+    element.style.border = '2px solid #000000';
+    element.style.boxShadow = 'none';
+    
+    // すべての要素のスタイルを調整
     elementsToStyle.forEach((el, index) => {
-      // テキスト要素のみ対象
+      // スタイル情報を保存
+      originalStyles[index] = {
+        color: el.style.color,
+        fontWeight: el.style.fontWeight,
+        textShadow: el.style.textShadow,
+        backgroundColor: el.style.backgroundColor,
+        borderColor: el.style.borderColor,
+        opacity: el.style.opacity
+      };
+      
+      // テキスト要素の処理
       if (el.innerText && el.innerText.trim().length > 0) {
-        originalStyles[index] = {
-          color: el.style.color,
-          fontWeight: el.style.fontWeight,
-          textShadow: el.style.textShadow
-        };
-        
-        // 色を濃くし、フォントを太くする
+        // テキストを黒く、太く、鮮明に
         el.style.color = '#000000';
-        el.style.fontWeight = 'bold';
-        // テキストにシャドウを追加して読みやすくする
-        el.style.textShadow = '0 0 0 #000';
+        el.style.fontWeight = '900'; // 最も太いフォント
+        el.style.textShadow = 'none'; // シャドウを削除してクリアに
+        el.style.opacity = '1'; // 完全に不透明に
+      }
+      
+      // 背景色を持つ要素は、より濃い色に
+      if (el.style.backgroundColor && el.style.backgroundColor !== 'transparent' && el.style.backgroundColor !== '') {
+        // 背景色を持つ要素は、より鮮明に
+        try {
+          // 背景色が薄い場合は濃くする
+          const bgColor = window.getComputedStyle(el).backgroundColor;
+          if (bgColor.includes('rgba') && bgColor.split(',')[3].includes('0.')) {
+            // 透明度が低い場合は上げる
+            el.style.backgroundColor = bgColor.replace(/rgba\((.*?),(.*?),(.*?),.*?\)/, 'rgba($1,$2,$3,1)');
+          }
+        } catch (e) {
+          // エラー時は何もしない
+        }
+      }
+      
+      // ボーダーを持つ要素は、より濃いボーダーに
+      if (el.style.borderColor) {
+        el.style.borderColor = '#000000';
       }
     });
     
     return () => {
       // 元のスタイルに戻す
+      element.style.backgroundColor = originalContainerStyle.backgroundColor;
+      element.style.border = originalContainerStyle.border;
+      element.style.boxShadow = originalContainerStyle.boxShadow;
+      
       elementsToStyle.forEach((el, index) => {
         if (originalStyles[index]) {
           el.style.color = originalStyles[index].color;
           el.style.fontWeight = originalStyles[index].fontWeight;
           el.style.textShadow = originalStyles[index].textShadow;
+          el.style.backgroundColor = originalStyles[index].backgroundColor;
+          el.style.borderColor = originalStyles[index].borderColor;
+          el.style.opacity = originalStyles[index].opacity;
         }
       });
     };
@@ -79,15 +124,35 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       // プリント前に要素のスタイルを調整
       const restoreStyles = prepareElementForPrinting(printTargetRef.current);
       
-      // HTML要素をキャンバスに変換
-      const canvas = await html2canvas(printTargetRef.current, CANVAS_OPTIONS);
+      // 印刷対象要素のクローンを作成して修正を適用
+      const clonedElement = printTargetRef.current.cloneNode(true);
+      document.body.appendChild(clonedElement);
+      clonedElement.style.position = 'absolute';
+      clonedElement.style.left = '-9999px';
+      clonedElement.style.width = '1200px'; // 固定幅で一貫性を確保
+      
+      // クローンに対してスタイル調整を適用
+      const restoreClonedStyles = prepareElementForPrinting(clonedElement);
+      
+      // 少し待機して、スタイル変更が適用されるのを待つ
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // HTML要素をキャンバスに変換（クローンを使用）
+      const canvas = await html2canvas(clonedElement, CANVAS_OPTIONS);
       console.log('HTML要素をキャンバスに変換しました');
+      
+      // クローンを削除
+      restoreClonedStyles();
+      document.body.removeChild(clonedElement);
       
       // スタイルを元に戻す
       restoreStyles();
       
-      // PDFを生成
+      // PDFを生成（日本語フォント設定）
       const pdf = new jsPDF(PDF_OPTIONS);
+      
+      // 日本語フォントを設定
+      pdf.setFont('kozgopromedium', 'normal');
       
       // キャンバスを高品質のPNGとしてPDFに追加
       const imgData = canvas.toDataURL('image/png', 1.0); // 最高品質
@@ -96,7 +161,18 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
       // コントラストを高めるための設定
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      // 圧縮なしで高品質画像を追加
+      pdf.addImage({
+        imageData: imgData,
+        format: 'PNG',
+        x: 0,
+        y: 0,
+        width: pdfWidth,
+        height: pdfHeight,
+        compression: 'NONE',
+        rotation: 0,
+        mask: false
+      });
       console.log('キャンバスをPDFに追加しました');
       
       // PDFをブラウザで表示
@@ -130,9 +206,26 @@ export default function JapanesePdfGenerator({ data, printTargetRef, onGenerateS
       // プリント前に要素のスタイルを調整
       const restoreStyles = prepareElementForPrinting(printTargetRef.current);
 
-      // HTML要素をキャンバスに変換
-      const canvas = await html2canvas(printTargetRef.current, CANVAS_OPTIONS);
+      // 印刷対象要素のクローンを作成して修正を適用
+      const clonedElement = printTargetRef.current.cloneNode(true);
+      document.body.appendChild(clonedElement);
+      clonedElement.style.position = 'absolute';
+      clonedElement.style.left = '-9999px';
+      clonedElement.style.width = '1200px'; // 固定幅で一貫性を確保
+      
+      // クローンに対してスタイル調整を適用
+      const restoreClonedStyles = prepareElementForPrinting(clonedElement);
+      
+      // 少し待機して、スタイル変更が適用されるのを待つ
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // HTML要素をキャンバスに変換（クローンを使用）
+      const canvas = await html2canvas(clonedElement, CANVAS_OPTIONS);
       console.log('HTML要素をキャンバスに変換しました');
+      
+      // クローンを削除
+      restoreClonedStyles();
+      document.body.removeChild(clonedElement);
       
       // スタイルを元に戻す
       restoreStyles();
